@@ -1,80 +1,62 @@
-import streamlit as st
-import pickle
-import re
-import nltk
+import whois
+import tldextract
+from datetime import datetime
+import urllib.parse
 
-nltk.download('punkt')
-nltk.download('stopwords')
+def check_scam_url(url):
+    score = 100
+    red_flags = []
+    
+    # 1. Normalize URL
+    if not url.startswith('http'):
+        url = 'http://' + url
+        
+    extracted = tldextract.extract(url)
+    domain = f"{extracted.domain}.{extracted.suffix}"
+    
+    # 2. Check for Cheap/Suspicious TLDs
+    suspicious_tlds = ['xyz', 'top', 'online', 'vip', 'click', 'site']
+    if extracted.suffix in suspicious_tlds:
+        score -= 30
+        red_flags.append(f"Suspicious Top-Level Domain (.{extracted.suffix})")
 
-#loading models
-clf = pickle.load(open('clf.pkl','rb'))
-tfidfd = pickle.load(open('tfidf.pkl','rb'))
+    # 3. Keyword Heuristics (Look for scammy words in URL)
+    scam_keywords = ['guaranteed', 'free-job', 'offer-letter', 'urgent-hiring', 'registration-fee', 'refund']
+    for word in scam_keywords:
+        if word in url.lower():
+            score -= 20
+            red_flags.append(f"Suspicious keyword found in URL: '{word}'")
+            
+    # 4. Domain Age Check (The Ultimate Lie Detector)
+    try:
+        domain_info = whois.whois(domain)
+        creation_date = domain_info.creation_date
+        
+        # Handle cases where creation_date is a list
+        if isinstance(creation_date, list):
+            creation_date = creation_date[0]
+            
+        if creation_date:
+            age_days = (datetime.now() - creation_date).days
+            if age_days < 30:
+                score -= 40
+                red_flags.append(f"Domain is very new! Only {age_days} days old. Major Red Flag for jobs.")
+            elif age_days < 180:
+                score -= 15
+                red_flags.append("Domain is relatively new (less than 6 months old). Proceed with caution.")
+    except Exception as e:
+        score -= 20
+        red_flags.append("Could not verify WHOIS data. Domain might be hidden or invalid.")
 
-def clean_resume(resume_text):
-    clean_text = re.sub('http\S+\s*', ' ', resume_text)
-    clean_text = re.sub('RT|cc', ' ', clean_text)
-    clean_text = re.sub('#\S+', '', clean_text)
-    clean_text = re.sub('@\S+', '  ', clean_text)
-    clean_text = re.sub('[%s]' % re.escape("""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""), ' ', clean_text)
-    clean_text = re.sub(r'[^\x00-\x7f]', r' ', clean_text)
-    clean_text = re.sub('\s+', ' ', clean_text)
-    return clean_text
-# web app
-def main():
-    st.title("Resume Screening App")
-    uploaded_file = st.file_uploader('Upload Resume', type=['txt','pdf'])
+    # Final Verdict
+    if score >= 80:
+        status = "Safe ✅"
+    elif score >= 50:
+        status = "Suspicious ⚠️"
+    else:
+        status = "Highly Likely a Scam 🚨"
+        
+    return {"status": status, "score": score, "red_flags": red_flags}
 
-    if uploaded_file is not None:
-        try:
-            resume_bytes = uploaded_file.read()
-            resume_text = resume_bytes.decode('utf-8')
-        except UnicodeDecodeError:
-            # If UTF-8 decoding fails, try decoding with 'latin-1'
-            resume_text = resume_bytes.decode('latin-1')
-
-        cleaned_resume = clean_resume(resume_text)
-        input_features = tfidfd.transform([cleaned_resume])
-        prediction_id = clf.predict(input_features)[0]
-        st.write(prediction_id)
-
-        # Map category ID to category name
-        category_mapping = {
-            15: "Java Developer",
-            23: "Testing",
-            8: "DevOps Engineer",
-            20: "Python Developer",
-            24: "Web Designing",
-            12: "HR",
-            13: "Hadoop",
-            3: "Blockchain",
-            10: "ETL Developer",
-            18: "Operations Manager",
-            6: "Data Science",
-            22: "Sales",
-            16: "Mechanical Engineer",
-            1: "Arts",
-            7: "Database",
-            11: "Electrical Engineering",
-            14: "Health and fitness",
-            19: "PMO",
-            4: "Business Analyst",
-            9: "DotNet Developer",
-            2: "Automation Testing",
-            17: "Network Security Engineer",
-            21: "SAP Developer",
-            5: "Civil Engineer",
-            0: "Advocate",
-        }
-
-        category_name = category_mapping.get(prediction_id, "Unknown")
-
-        st.write("Predicted Category:", category_name)
-
-
-
-# python main
-if __name__ == "__main__":
-    main()
-avatar
-Ask In Chat
-Ask In Chat
+# --- Testing the function ---
+# print(check_scam_url("http://tcs-guaranteed-job.xyz"))
