@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DIGIPATH.AI</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Orbitron:wght@500;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --neon-green: #00FF9F;
+    --neon-cyan:  #00F0FF;
+    --dark-bg:    #050A0F;
+    --panel:      #0F1A24;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--dark-bg);
+    color: var(--neon-green);
+    font-family: 'DM Sans', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    background-image:
+      radial-gradient(circle at 50% 10%, rgba(0,255,159,0.08) 0%, transparent 70%),
+      linear-gradient(180deg, #050A0F 0%, #0A1019 100%);
+  }
+  #app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  #header {
+    background: rgba(15,26,36,0.95);
+    border: 2px solid var(--neon-green);
+    box-shadow: 0 0 30px rgba(0,255,159,0.4);
+    border-radius: 8px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--neon-green);
+    text-shadow: 0 0 20px var(--neon-green);
+  }
+  .tag {
+    font-family: 'VT323', monospace;
+    font-size: 13px;
+    color: var(--neon-cyan);
+    padding: 3px 10px;
+    border: 1px solid var(--neon-cyan);
+    border-radius: 4px;
+    margin-left: 10px;
+  }
+  .sdot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: 0 0 8px var(--neon-green);
+    display: inline-block;
+    animation: blink 2s ease infinite;
+  }
+
+  /* CHIPS */
+  #chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0 8px;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  #chips::-webkit-scrollbar { display: none; }
+  .chip {
+    background: var(--panel);
+    border: 1.5px solid var(--neon-green);
+    color: var(--neon-green);
+    padding: 6px 15px;
+    border-radius: 6px;
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    white-space: nowrap;
+    box-shadow: 0 0 10px rgba(0,255,159,0.2);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .chip:hover {
+    background: var(--neon-green);
+    color: #000;
+    box-shadow: 0 0 22px var(--neon-green);
+  }
+
+  /* MESSAGES */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    background: #0A121B;
+    border: 2px solid var(--neon-green);
+    border-radius: 8px;
+    box-shadow: inset 0 0 40px rgba(0,255,159,0.07);
+  }
+  #messages::-webkit-scrollbar { width: 3px; }
+  #messages::-webkit-scrollbar-thumb { background: rgba(0,255,159,0.2); border-radius: 99px; }
+
+  /* INPUT */
+  #input-area { margin-top: 10px; flex-shrink: 0; }
+  .input-box {
+    background: var(--panel);
+    border: 2px solid var(--neon-green);
+    border-radius: 8px;
+    padding: 10px 12px 10px 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    box-shadow: 0 0 28px rgba(0,255,159,0.45);
+  }
+  #user-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--neon-green);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    min-height: 24px;
+    max-height: 96px;
+    resize: none;
+    overflow-y: auto;
+    caret-color: var(--neon-green);
+  }
+  #user-input::placeholder { color: rgba(0,255,159,0.3); }
+  #user-input::-webkit-scrollbar { display: none; }
+  .send-btn {
+    background: var(--neon-green);
+    color: #000;
+    border: none;
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    font-size: 20px;
+    font-weight: 900;
+    box-shadow: 0 0 22px var(--neon-green);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .send-btn:hover { background: #fff; box-shadow: 0 0 30px #fff; }
+  .footer-txt {
+    text-align: center;
+    font-family: 'VT323', monospace;
+    font-size: 11px;
+    color: rgba(0,255,159,0.2);
+    margin-top: 5px;
+  }
+
+  /* Rich text inside bubbles */
+  .bbl { font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.75; color: rgba(0,255,159,0.9); }
+  .bbl strong { color: #fff; font-weight: 600; }
+  .bbl code { background: rgba(0,240,255,0.1); color: var(--neon-cyan); padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 13px; }
+  .bbl ul { margin: 4px 0; padding: 0; list-style: none; }
+  .bbl li { display: flex; gap: 8px; margin: 2px 0; }
+  .bbl .arr { color: var(--neon-cyan); flex-shrink: 0; }
+  .bbl hr { border: none; border-top: 1px solid rgba(0,255,159,0.12); margin: 8px 0; }
+  .bbl .hd { display: block; font-weight: 700; color: #fff; margin: 8px 0 3px; }
+  .bbl .hd:first-child { margin-top: 0; }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div style="display:flex;align-items:center;">
+      <div class="logo">DIGIPATH<span style="color:#00F0FF;">.AI</span></div>
+      <div class="tag">NEURAL v4.1</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="sdot"></span>
+      <span style="font-family:'VT323',monospace;font-size:13px;color:rgba(0,255,159,0.7);">SYSTEM ONLINE</span>
+    </div>
+  </div>
+
+  <!-- CHIPS -->
+  <div id="chips"></div>
+
+  <!-- MESSAGES -->
+  <div id="messages"></div>
+
+  <!-- INPUT -->
+  <div id="input-area">
+    <div class="input-box">
+      <textarea id="user-input" rows="1"
+        placeholder="ENTER QUERY... [e.g. penetration testing, VJTI fees]"></textarea>
+      <button class="send-btn" onclick="sendMessage()">→</button>
+    </div>
+    <p class="footer-txt">DIGIPATH.AI · HYBRID ML + CLAUDE · ENTER ↵ TO SEND</p>
+  </div>
+
+</div>
+<script>
+const API_URL = "http://localhost:5001";
+
+// ── 12 chips ──────────────────────────────────────────────────────────────────
+const QUICK_CHIPS = [
+  { label: "⚡ VJTI",             msg: "Tell me about VJTI" },
+  { label: "💻 DJSCE FEES",       msg: "DJSCE fees and placement" },
+  { label: "🎯 80% COLLEGE",      msg: "For 80% which college is best in Mumbai?" },
+  { label: "📋 MHT-CET",          msg: "MHT-CET cutoff for top colleges" },
+  { label: "💰 SCHOLARSHIPS",     msg: "What scholarships are available?" },
+  { label: "🏠 HOSTEL",           msg: "Which colleges have hostel in Mumbai?" },
+  { label: "🎣 PHISHING",         msg: "What is phishing attack?" },
+  { label: "💀 RANSOMWARE",       msg: "How does ransomware work?" },
+  { label: "🔐 CYBER CAREER",     msg: "Cybersecurity career options and salary" },
+  { label: "⚔️ ETHICAL HACKING",  msg: "How to become an ethical hacker?" },
+  { label: "🛡️ PEN TESTING",      msg: "What is penetration testing?" },
+  { label: "📋 CAP ROUND",        msg: "How does CAP round work?" },
+];
+
+// ── Markdown renderer ─────────────────────────────────────────────────────────
+function esc(t) {
+  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function parseInline(t) {
+  return esc(t)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function renderMD(raw) {
+  if (!raw) return "";
+  const lines = raw.split("\n");
+  let html = ""; let i = 0;
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (!ln.trim()) { html += "<br/>"; i++; continue; }
+    if (/^\*\*(.+)\*\*$/.test(ln.trim())) {
+      html += `<span class="hd">${esc(ln.trim().slice(2,-2))}</span>`; i++; continue;
+    }
+    if (/^[-─]{3,}$/.test(ln.trim())) { html += "<hr/>"; i++; continue; }
+    if (/^[•\-\*] /.test(ln.trim()) || /^\d+\. /.test(ln.trim())) {
+      html += "<ul>";
+      while (i < lines.length && (/^[•\-\*] /.test(lines[i].trim()) || /^\d+\. /.test(lines[i].trim()))) {
+        const c = lines[i].trim().replace(/^[•\-\*] /,"").replace(/^\d+\. /,"");
+        html += `<li><span class="arr">›</span><span>${parseInline(c)}</span></li>`;
+        i++;
+      }
+      html += "</ul>"; continue;
+    }
+    html += `<p style="margin:1px 0">${parseInline(ln)}</p>`; i++;
+  }
+  return html;
+}
+
+// ── Avatar HTML ───────────────────────────────────────────────────────────────
+const AVA = `<div style="width:38px;height:38px;flex-shrink:0;background:#0F1A24;
+  border:1.5px solid #00FF9F;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;font-size:16px;box-shadow:0 0 12px rgba(0,255,159,0.4);">⚡</div>`;
+
+// ── Build chips ───────────────────────────────────────────────────────────────
+function buildChips() {
+  const container = document.getElementById("chips");
+  QUICK_CHIPS.forEach(c => {
+    const btn = document.createElement("div");
+    btn.className   = "chip";
+    btn.textContent = c.label;
+    btn.addEventListener("click", () => sendMessage(c.msg));
+    container.appendChild(btn);
+  });
+}
+
+// ── Send — original working logic, no changes ─────────────────────────────────
+let isBusy = false;
+
+async function sendMessage(textOverride) {
+  const input = document.getElementById("user-input");
+  const text  = textOverride !== undefined
+                  ? String(textOverride).trim()
+                  : input.value.trim();
+  if (!text || isBusy) return;
+
+  isBusy = true;
+  input.value = "";
+  input.style.height = "24px";
+
+  const messages = document.getElementById("messages");
+
+  // User bubble
+  const uDiv = document.createElement("div");
+  uDiv.style.cssText = "text-align:right;margin:10px 0;animation:fadeUp 0.2s ease both;";
+  uDiv.innerHTML = `
+    <div style="display:inline-block;background:linear-gradient(135deg,#00FF9F,#00C8FF);
+      color:#000;padding:10px 16px;border-radius:10px 0 10px 10px;max-width:75%;
+      font-weight:600;font-size:14px;box-shadow:0 0 18px rgba(0,255,159,0.35);">
+      ${esc(text)}
+    </div>`;
+  messages.appendChild(uDiv);
+  messages.scrollTop = messages.scrollHeight;
+
+  // Typing indicator
+  const typing = document.createElement("div");
+  typing.style.cssText = "display:flex;gap:12px;margin:10px 0;align-items:center;";
+  typing.innerHTML = `${AVA}
+    <div style="background:#0F1A24;border:1.5px solid #00FF9F;padding:11px 15px;
+      border-radius:0 10px 10px 10px;font-family:'VT323',monospace;color:#00FF9F;
+      font-size:15px;">[AI] PROCESSING...</div>`;
+  messages.appendChild(typing);
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res  = await fetch(`${API_URL}/chat`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+
+    typing.remove();
+
+    const bDiv = document.createElement("div");
+    bDiv.style.cssText = "display:flex;gap:12px;margin:10px 0;animation:fadeUp 0.25s ease both;";
+    bDiv.innerHTML = `${AVA}
+      <div style="flex:1;min-width:0;">
+        <div style="background:#0F1A24;border:1.5px solid #00FF9F;padding:12px 16px;
+          border-radius:0 10px 10px 10px;max-width:85%;
+          box-shadow:0 0 12px rgba(0,255,159,0.15);">
+          <div class="bbl">${renderMD(data.response || "SCAN COMPLETE.")}</div>
+        </div>
+        <div style="font-family:'VT323',monospace;font-size:11px;
+          color:rgba(0,255,159,0.25);margin-top:3px;">
+          ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+          ${data.confidence > 40 ? " · " + Math.round(data.confidence) + "% MATCH" : ""}
+        </div>
+      </div>`;
+    messages.appendChild(bDiv);
+    messages.scrollTop = messages.scrollHeight;
+
+  } catch(e) {
+    typing.remove();
+    const errDiv = document.createElement("div");
+    errDiv.style.cssText = "color:#FF3B5C;margin:10px 0;font-family:'VT323',monospace;font-size:14px;";
+    errDiv.textContent = "[ERROR] CONNECTION FAILED — is hybrid_chatbot.py running on port 5001?";
+    messages.appendChild(errDiv);
+    messages.scrollTop = messages.scrollHeight;
+  } finally {
+    isBusy = false;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  buildChips();
+
+  const inp = document.getElementById("user-input");
+
+  // Auto-resize
+  inp.addEventListener("input", () => {
+    inp.style.height = "auto";
+    inp.style.height = Math.min(inp.scrollHeight, 96) + "px";
+  });
+
+  // Enter key — send on Enter, newline on Shift+Enter
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Welcome message
+  const messages = document.getElementById("messages");
+  const welcome  = document.createElement("div");
+  welcome.style.cssText = "display:flex;gap:12px;margin:8px 0;";
+  welcome.innerHTML = `${AVA}
+    <div style="background:#0F1A24;border:1.5px solid #00FF9F;padding:12px 16px;
+      border-radius:0 10px 10px 10px;max-width:86%;
+      box-shadow:0 0 12px rgba(0,255,159,0.15);">
+      <div class="bbl">
+        DIGIPATH.AI NEURAL CORE ONLINE<br/><br/>
+        Hello! I'm your AI guide for <strong>College Admissions</strong> and <strong>Cybersecurity</strong>.<br/><br/>
+        <span class="hd">🎓 College Queries</span>
+        <ul>
+          <li><span class="arr">›</span><span>VJTI, SPIT, DJSCE, IIT Bombay, KJ Somaiya &amp; 10+ colleges</span></li>
+          <li><span class="arr">›</span><span>MHT-CET cutoffs, fees, hostel, placements, scholarships</span></li>
+        </ul>
+        <span class="hd">🔐 Cybersecurity</span>
+        <ul>
+          <li><span class="arr">›</span><span>Phishing, Malware, Ransomware, SQL Injection, Pen Testing</span></li>
+          <li><span class="arr">›</span><span>Career paths, tools, certifications (OSCP, CEH)</span></li>
+        </ul>
+        <br/>Pick a quick topic or type your query!
+      </div>
+    </div>`;
+  messages.appendChild(welcome);
+  inp.focus();
+});
+</script>
+</body>
+</html>
