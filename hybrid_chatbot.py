@@ -12,8 +12,10 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ── API Key ────────────────────────────────────────────────────────────────────
-CLAUDE_KEY = os.environ.get("ANTHROPIC_API_KEY", "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")
+# ── API Keys ───────────────────────────────────────────────────────────────────
+GROQ_KEY   = os.environ.get("GROQ_API_KEY",   "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")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY",  "AIzaSyARZsd1QcSsBitUONcEsf3xYS24TP7F_pM")
+AI_PROVIDER = "groq"  # "groq" or "gemini"
 
 nltk.download('stopwords', quiet=True)
 nltk.download('wordnet',   quiet=True)
@@ -89,48 +91,52 @@ def preprocess(text):
     return " ".join(lemmatizer.lemmatize(t) for t in tokens
                     if t.isalpha() and t not in stop_words)
 
-# ── Config ─────────────────────────────────────────────────────────────────────
-ML_THRESHOLD       = 0.55
-SEMANTIC_THRESHOLD = 0.28
-CLAUDE_API_URL     = "https://api.anthropic.com/v1/messages"
-CLAUDE_MODEL       = "claude-sonnet-4-20250514"
+# ── Thresholds ─────────────────────────────────────────────────────────────────
+ML_THRESHOLD       = 0.35
+SEMANTIC_THRESHOLD = 0.20
 
-DATASET_CONTEXT = """You are DigiPath College & Cybersecurity Assistant for students in Mumbai, Maharashtra.
+# ── System prompt for AI ───────────────────────────────────────────────────────
+SYSTEM_PROMPT = """You are DigiPath Assistant — an AI guide for students in Mumbai, Maharashtra.
+You help with TWO domains:
 
-COLLEGE KNOWLEDGE:
-- Top colleges: IIT Bombay, VJTI, SPIT, DJSCE, KJSCE, TSEC, VESIT, SAKEC, SPCE, CRCE, COEP Pune, RAIT, MPSTME (NMIMS)
-- Key facts: VJTI fees ~₹60k/year (best ROI), DJSCE avg ₹11.1 LPA, IIT Bombay avg ₹23.5 LPA, KJSCE highest ₹58 LPA
-- Admission: MHT-CET + CAP rounds via DTE Maharashtra (dte.maharashtra.gov.in)
-- Scholarships: EBC freeship, SC/ST govt scholarship — apply at mahadbt.maharashtra.gov.in
+1. COLLEGE ADMISSIONS (Mumbai & Maharashtra):
+- Colleges: IIT Bombay, VJTI, SPIT, DJSCE, KJSCE, TSEC, VESIT, SAKEC, SPCE, CRCE, COEP Pune, RAIT, MPSTME/NMIMS
+- Fees: VJTI ~₹60k/year, DJSCE ~₹74k-2.2L/year, IIT Bombay ~₹2L/year
+- Placements: VJTI avg ₹16.35 LPA, DJSCE avg ₹11.1 LPA, IIT Bombay avg ₹23.5 LPA
+- Admission: MHT-CET + CAP rounds via dte.maharashtra.gov.in
+- Scholarships: EBC freeship, SC/ST — mahadbt.maharashtra.gov.in
+- Percentile guide:
+  99.5%+ → VJTI CSE, SPIT CSE, DJSCE CSE
+  97-99% → TSEC, KJSCE, VESIT
+  90-96% → SAKEC, SPCE, CRCE, RAIT
+  80-89% → SAKEC, RAIT, Atharva, MGM, KES
+  70-79% → Private Mumbai colleges
+  Below 70% → Institute-level round
 
-PERCENTILE → COLLEGE GUIDE:
-- 99.5%+ → VJTI, SPIT, DJSCE (top tier)
-- 97–99% → TSEC, KJSCE, VESIT
-- 90–96% → SAKEC, SPCE, CRCE, RAIT
-- 80–89% → SAKEC, RAIT, Atharva, MGM, KES
-- 70–79% → Private colleges in Mumbai suburbs
-- Below 70% → Institute-level round colleges
-
-CYBERSECURITY KNOWLEDGE:
+2. CYBERSECURITY:
 - Attacks: Phishing, Malware, Ransomware, DDoS, SQL Injection, XSS, MITM, Social Engineering
-- Defense: Firewalls, VPN, Encryption, Zero Trust, MFA, Password Security
-- Career: CEH, OSCP, CompTIA Security+, CISSP — avg ₹8–25 LPA in India
+- Job/Internship Scams: fake HR emails, OTP fraud, advance fee scams, fake offer letters
+- Defense: Firewalls, VPN, Encryption, Zero Trust, MFA, Password managers
+- Career: CEH, OSCP, CompTIA Security+, CISSP — avg ₹8-25 LPA in India
 - Tools: Nmap, Metasploit, Wireshark, Burp Suite, Kali Linux
-- Penetration Testing: Legal ethical hacking, 5 phases: Recon→Scan→Exploit→Maintain→Report
+- Penetration testing: 5 phases — Recon → Scan → Exploit → Post-exploit → Report
 - India laws: IT Act 2000, Section 66, cybercrime.gov.in, helpline 1930
 
 RESPONSE RULES:
-- Be concise (max 200 words), use bullet points for lists
+- Be concise and helpful (max 250 words)
+- Use bullet points for lists
 - Use ₹ for Indian currency
-- For unknown colleges: give general guidance + mention DTE Maharashtra
-- Stay in college/cybersecurity context only
-- Never fabricate specific numbers you are not sure about"""
+- Answer in the same language the user writes in (Hindi/Hinglish/English)
+- If asked something completely unrelated to colleges or cybersecurity, politely redirect
+- Never make up specific numbers you are not sure about"""
 
-# ── SHORTCUTS dict (Layer 1 keyword matching) ──────────────────────────────────
+# ── SHORTCUTS — Layer 1 keyword matching ──────────────────────────────────────
 SHORTCUTS = {
-    r'\b(hi|hello|hey|namaste|hii)\b':                              "greeting",
-    r'\b(bye|goodbye|see you|cya)\b':                               "goodbye",
-    r'\b(thanks?|thank you|thx)\b':                                 "thanks",
+    r'\b(hi|hello|hey|namaste|hii|helo)\b':                         "greeting",
+    r'\b(bye|goodbye|see you|cya|alvida)\b':                        "goodbye",
+    r'\b(thanks?|thank you|thx|shukriya|dhanyawad)\b':              "thanks",
+    # Scam/fraud — placed ABOVE internship to match first
+    r'\b(scam|fraud|fake job|job fraud|internship scam|internship fraud|fake offer|fake hr|fake letter)\b': "cyber_social_engineering",
     r'\b(vjti)\b':                                                  "vjti_mumbai",
     r'\b(spit)\b':                                                  "spit_mumbai",
     r'\b(djsce|dj sanghvi)\b':                                     "djsce_mumbai",
@@ -148,7 +154,7 @@ SHORTCUTS = {
     r'\b(cap round)\b':                                             "cap_round",
     r'\b(scholarship|freeship|mahadbt)\b':                          "scholarship",
     r'\b(hostel)\b':                                                "hostel_mumbai",
-    r'\b(internship)\b':                                            "internship",
+    r'\b(internship|internships)\b':                                "internship",
     r'\b(lateral entry|dsy)\b':                                     "lateral_entry",
     r'\b(attendance)\b':                                            "attendance",
     r'\b(atkt|backlog|kt exam)\b':                                  "revaluation",
@@ -173,8 +179,7 @@ SHORTCUTS = {
     r'\b(incident response|soc analyst)\b':                         "cyber_incident_response",
 }
 
-# ── Core functions ─────────────────────────────────────────────────────────────
-
+# ── ML functions ───────────────────────────────────────────────────────────────
 def keyword_match(text):
     t = text.lower()
     for pattern, tag in SHORTCUTS.items():
@@ -182,17 +187,15 @@ def keyword_match(text):
             return tag
     return None
 
-
 def semantic_search(text):
     if not TAG_VECTORS:
         return None, 0.0
-    q_vec = vectorizer.transform([preprocess(text)])
-    q_arr = np.asarray(q_vec.todense())
+    q_vec  = vectorizer.transform([preprocess(text)])
+    q_arr  = np.asarray(q_vec.todense())
     scores = [(tag, float(cosine_similarity(q_arr, vec)[0][0]))
               for tag, vec in TAG_VECTORS.items()]
     scores.sort(key=lambda x: -x[1])
     return scores[0]
-
 
 def ml_classify(text):
     vec = vectorizer.transform([preprocess(text)])
@@ -206,67 +209,136 @@ def ml_classify(text):
         exp_s = np.exp(dec - dec.max())
         return le.classes_[idx], float(exp_s[idx] / exp_s.sum())
 
+# ── Groq API ───────────────────────────────────────────────────────────────────
+# Groq available models (free): llama-3.3-70b-versatile, llama-3.1-8b-instant,
+#                                mixtral-8x7b-32768, gemma2-9b-it
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",   # best quality, still free
+    "llama-3.1-8b-instant",      # fastest
+    "mixtral-8x7b-32768",        # good fallback
+]
 
-def claude_api(user_message, local_hint=None):
+def call_groq(user_message, local_hint=None):
+    if not GROQ_KEY or GROQ_KEY == "YOUR_NEW_GROQ_KEY_HERE":
+        print("  ⚠️  Groq key not set")
+        return None, "no_key"
+
+    content = user_message
     if local_hint:
-        content = (
-            f"Student question: {user_message}\n\n"
-            f"Context from my dataset (may be partial):\n{local_hint}\n\n"
-            f"Give a complete, helpful, concise answer."
-        )
-    else:
-        content = user_message
+        content = (f"Student question: {user_message}\n\n"
+                   f"Relevant context from my knowledge base:\n{local_hint}\n\n"
+                   f"Using this context and your knowledge, give a complete helpful answer.")
 
-    headers = {
-        "Content-Type":      "application/json",
-        "anthropic-version": "2023-06-01",
-    }
-    if CLAUDE_KEY:
-        headers["x-api-key"] = CLAUDE_KEY
+    # Try models in order until one works
+    for model_name in GROQ_MODELS:
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_KEY}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "model":    model_name,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user",   "content": content},
+                    ],
+                    "max_tokens":  450,
+                    "temperature": 0.5,
+                },
+                timeout=12,
+            )
+
+            if resp.status_code == 200:
+                text = resp.json()["choices"][0]["message"]["content"].strip()
+                print(f"  ✅ Groq success ({model_name})")
+                return text, "groq"
+
+            # 429 = rate limit, try next model
+            # 404 = model not found, try next model
+            if resp.status_code in [429, 404]:
+                print(f"  ⚠️  Groq {resp.status_code} on {model_name}, trying next...")
+                continue
+
+            print(f"  ❌ Groq HTTP {resp.status_code}: {resp.text[:150]}")
+            return None, f"groq_{resp.status_code}"
+
+        except requests.Timeout:
+            print(f"  ⚠️  Groq timeout on {model_name}, trying next...")
+            continue
+        except Exception as e:
+            print(f"  ❌ Groq error: {e}")
+            return None, "error"
+
+    return None, "all_models_failed"
+
+# ── Gemini API ─────────────────────────────────────────────────────────────────
+def call_gemini(user_message, local_hint=None):
+    if not GEMINI_KEY or GEMINI_KEY == "YOUR_GEMINI_KEY_HERE":
+        return None, "no_key"
+
+    content = user_message
+    if local_hint:
+        content = f"Context: {local_hint}\n\nQuestion: {user_message}"
 
     try:
         resp = requests.post(
-            CLAUDE_API_URL,
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}",
+            headers={"Content-Type": "application/json"},
             json={
-                "model":      CLAUDE_MODEL,
-                "max_tokens": 500,
-                "system":     DATASET_CONTEXT,
-                "messages":   [{"role": "user", "content": content}],
+                "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\n{content}"}]}],
+                "generationConfig": {"maxOutputTokens": 450, "temperature": 0.5}
             },
-            headers = headers,
-            timeout = 15,
+            timeout=14,
         )
         if resp.status_code == 200:
-            return resp.json()["content"][0]["text"].strip(), "claude"
-        print(f"  ❌ Claude HTTP {resp.status_code}: {resp.text[:150]}")
-        return None, f"http_{resp.status_code}"
+            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            print(f"  ✅ Gemini success")
+            return text, "gemini"
+        print(f"  ❌ Gemini HTTP {resp.status_code}: {resp.text[:120]}")
+        return None, f"gemini_{resp.status_code}"
     except requests.Timeout:
-        print("  ❌ Claude timeout")
         return None, "timeout"
     except Exception as e:
-        print(f"  ❌ Claude error: {e}")
+        print(f"  ❌ Gemini error: {e}")
         return None, "error"
 
+# ── Unified AI call — tries both providers ─────────────────────────────────────
+def call_ai(user_message, local_hint=None):
+    if AI_PROVIDER == "gemini":
+        result, status = call_gemini(user_message, local_hint)
+        if result: return result, "gemini"
+        result, status = call_groq(user_message, local_hint)
+        if result: return result, "groq"
+    else:
+        result, status = call_groq(user_message, local_hint)
+        if result: return result, "groq"
+        result, status = call_gemini(user_message, local_hint)
+        if result: return result, "gemini"
+    return None, status
 
+# ── Smart fallback ─────────────────────────────────────────────────────────────
 def smart_fallback(text):
     msg = text.lower()
     if any(w in msg for w in ["college","fees","admission","cutoff","placement",
-                               "hostel","scholarship","percentile"]):
+                               "hostel","scholarship","percentile","engineering"]):
         return ("For Maharashtra engineering admissions:\n"
-                "• Visit dte.maharashtra.gov.in\n"
-                "• Check NIRF: nirfindia.org\n\n"
-                "Tell me your percentile + branch for specific college suggestions!")
+                "• DTE Maharashtra: dte.maharashtra.gov.in\n"
+                "• NIRF Rankings: nirfindia.org\n\n"
+                "Tell me your MHT-CET percentile and preferred branch — "
+                "I'll suggest the best colleges for you!")
     if any(w in msg for w in ["cyber","hack","security","attack","phish",
-                               "malware","pentest","penetration"]):
-        return ("I'm your cybersecurity guide! Try:\n"
+                               "malware","scam","fraud","pentest","virus"]):
+        return ("I'm your cybersecurity guide! Try asking:\n"
                 "• 'What is phishing?'\n"
                 "• 'How does ransomware work?'\n"
-                "• 'Ethical hacking career guide'")
+                "• 'How do internship scams work?'\n"
+                "• 'Ethical hacking career and salary'")
     return ("I can help with:\n"
             "🎓 College admissions, fees, placements in Mumbai\n"
             "🔐 Cybersecurity concepts, careers, certifications\n\n"
             "Try: 'Tell me about VJTI' or 'What is SQL injection?'")
-
 
 # ── CORS ───────────────────────────────────────────────────────────────────────
 @app.after_request
@@ -276,26 +348,27 @@ def after_request(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
-
 # ── Routes ─────────────────────────────────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def index():
     return render_template("chatbot.html")
 
-
 @app.route("/api", methods=["GET"])
 def health():
+    groq_ok   = bool(GROQ_KEY)   and GROQ_KEY   != "YOUR_NEW_GROQ_KEY_HERE"
+    gemini_ok = bool(GEMINI_KEY) and GEMINI_KEY != "YOUR_GEMINI_KEY_HERE"
     return jsonify({
-        "status":    "DigiPath Hybrid Chatbot v4.1 ✅",
+        "status":    "DigiPath Hybrid Chatbot v5.0 ✅",
         "intents":   meta["intents"],
         "patterns":  meta["patterns"],
         "accuracy":  meta["accuracy"],
         "model":     meta.get("model", ""),
-        "mode":      "Keyword → Semantic → ML → Claude",
-        "claude_key": "set" if CLAUDE_KEY else "not set",
+        "mode":      "Keyword → Semantic → ML → Free AI",
+        "groq":      "✅ ready" if groq_ok   else "❌ key needed",
+        "gemini":    "✅ ready" if gemini_ok else "❌ key needed",
+        "provider":  AI_PROVIDER,
         "domains":   meta.get("domains", {}),
     })
-
 
 @app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
@@ -309,7 +382,7 @@ def chat():
 
     print(f"\n── Query: {message[:70]}")
 
-    # ── LAYER 1: Keyword match ─────────────────────────────────────────────
+    # ── L1: Keyword ───────────────────────────────────────────────────────
     kw_tag = keyword_match(message)
     if kw_tag and kw_tag in responses:
         resp   = random.choice(responses[kw_tag])
@@ -321,47 +394,44 @@ def chat():
             "source": "keyword_match", "is_fallback": False,
         })
 
-    # ── LAYER 2 + 3: Semantic + ML ────────────────────────────────────────
+    # ── L2+L3: Semantic + ML ──────────────────────────────────────────────
     sem_tag, sem_score = semantic_search(message)
     ml_tag,  ml_conf   = ml_classify(message)
     print(f"   L2 SEMANTIC → {sem_tag} ({sem_score:.3f})")
     print(f"   L3 ML       → {ml_tag}  ({ml_conf:.3f})")
 
-    # Both agree
     if sem_tag == ml_tag and sem_score >= SEMANTIC_THRESHOLD:
         resp   = random.choice(responses.get(sem_tag, [""]))
         domain = domain_map.get(sem_tag, "general")
         conf   = min(95.0, (sem_score * 60 + ml_conf * 40) * 100)
-        print(f"   ✅ HYBRID AGREEMENT → {sem_tag}")
+        print(f"   ✅ HYBRID → {sem_tag}")
         return jsonify({
             "intent": sem_tag, "domain": domain,
             "confidence": round(conf, 1), "response": resp,
             "source": "hybrid_agreement", "is_fallback": False,
         })
 
-    # Semantic wins
     if sem_score >= SEMANTIC_THRESHOLD and sem_tag in responses:
         resp   = random.choice(responses[sem_tag])
         domain = domain_map.get(sem_tag, "general")
-        print(f"   ✅ SEMANTIC WINS → {sem_tag}")
+        print(f"   ✅ SEMANTIC → {sem_tag}")
         return jsonify({
             "intent": sem_tag, "domain": domain,
             "confidence": round(sem_score * 100, 1), "response": resp,
             "source": "semantic_wins", "is_fallback": False,
         })
 
-    # ML wins
     if ml_conf >= ML_THRESHOLD and ml_tag in responses:
         resp   = random.choice(responses[ml_tag])
         domain = domain_map.get(ml_tag, "general")
-        print(f"   ✅ ML WINS → {ml_tag}")
+        print(f"   ✅ ML → {ml_tag}")
         return jsonify({
             "intent": ml_tag, "domain": domain,
             "confidence": round(ml_conf * 100, 1), "response": resp,
             "source": "ml_wins", "is_fallback": False,
         })
 
-    # ── LAYER 4: Claude API ────────────────────────────────────────────────
+    # ── L4: AI API ────────────────────────────────────────────────────────
     best_tag   = sem_tag if sem_score >= ml_conf else ml_tag
     best_score = max(sem_score, ml_conf)
 
@@ -369,23 +439,23 @@ def chat():
     if best_score >= 0.08 and best_tag in responses:
         local_hint = random.choice(responses[best_tag])
 
-    print(f"   → L4 CLAUDE (best local: {best_tag} @ {best_score:.3f})")
-    claude_resp, status = claude_api(message, local_hint=local_hint)
+    print(f"   → L4 AI ({AI_PROVIDER}) [{best_tag} @ {best_score:.3f}]")
+    ai_resp, status = call_ai(message, local_hint=local_hint)
 
-    if claude_resp:
+    if ai_resp:
         domain = domain_map.get(best_tag, "general")
-        print(f"   ✅ CLAUDE SUCCESS")
+        print(f"   ✅ AI SUCCESS ({status})")
         return jsonify({
             "intent":      best_tag,
             "domain":      domain,
             "confidence":  round(best_score * 100, 1),
-            "response":    claude_resp,
-            "source":      "claude",
+            "response":    ai_resp,
+            "source":      status,
             "is_fallback": False,
         })
 
-    # ── LAYER 5: Smart fallback ────────────────────────────────────────────
-    print(f"   ⚠️  FALLBACK (Claude: {status})")
+    # ── L5: Fallback ──────────────────────────────────────────────────────
+    print(f"   ⚠️  FALLBACK ({status})")
     return jsonify({
         "intent":      "fallback",
         "domain":      "general",
@@ -395,34 +465,28 @@ def chat():
         "is_fallback": True,
     })
 
-
 @app.route("/suggest", methods=["GET"])
 def suggest():
     return jsonify({"suggestions": [
-        "Tell me about VJTI",
-        "DJSCE fees and placement",
-        "MHT-CET cutoff for top colleges",
-        "Best college for CS in Mumbai",
-        "For 80% which college is best?",
-        "What scholarships are available?",
-        "What is phishing attack?",
-        "How does ransomware work?",
-        "Penetration testing guide",
-        "Cybersecurity career options",
-        "IIT Bombay placement package",
-        "Which colleges have hostel in Mumbai?",
+        "Tell me about VJTI", "DJSCE fees and placement",
+        "MHT-CET cutoff for top colleges", "Best college for CS in Mumbai",
+        "For 80% which college is best?", "What scholarships are available?",
+        "What is phishing attack?", "How does ransomware work?",
+        "How do internship scams work?", "Cybersecurity career options",
+        "IIT Bombay placement package", "Penetration testing guide",
     ]})
 
-
 if __name__ == "__main__":
-    key_status = f"✅ Set ({CLAUDE_KEY[:12]}...)" if CLAUDE_KEY else "⚠️  Not set"
+    groq_ok   = bool(GROQ_KEY)   and GROQ_KEY   != "YOUR_NEW_GROQ_KEY_HERE"
+    gemini_ok = bool(GEMINI_KEY) and GEMINI_KEY != "YOUR_GEMINI_KEY_HERE"
     print(f"\n{'='*55}")
-    print(f"  🚀 DigiPath Hybrid Chatbot v4.1")
+    print(f"  🚀 DigiPath Hybrid Chatbot v5.0")
     print(f"  Model    : {meta['model']} ({meta['accuracy']}%)")
     print(f"  Intents  : {meta['intents']} | Patterns: {meta['patterns']}")
-    print(f"  Layers   : Keyword → Semantic → ML → Claude")
-    print(f"  API Key  : {key_status}")
+    print(f"  Layers   : Keyword → Semantic → ML → Free AI")
+    print(f"  Groq     : {'✅ Ready' if groq_ok   else '❌ Add key — console.groq.com'}")
+    print(f"  Gemini   : {'✅ Ready' if gemini_ok else '❌ Add key — aistudio.google.com'}")
+    print(f"  Provider : {AI_PROVIDER}")
     print(f"  UI       : http://localhost:5001/")
-    print(f"  Health   : http://localhost:5001/api")
     print(f"{'='*55}\n")
-    app.run(debug=True, port=5001, host="0.0.0.0")
+    app.run(debug=False, port=5001, host="0.0.0.0")
