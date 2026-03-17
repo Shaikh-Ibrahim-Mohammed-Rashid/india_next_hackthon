@@ -4,7 +4,7 @@
 
 ### AI-Powered Student Guidance & Fraud Detection Platform
 
-**KNOWCODE 3.0 Hackathon — Team THE DOMinators**
+**india next hackthon Hackathon — Team THE DOMinators**
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-2.3%2B-black?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com/)
@@ -643,7 +643,7 @@ KNOWCODE-3.0-THE-DOMinators/
 
 ## 15. Contributors
 
-**Team THE DOMinators — KNOWCODE 3.0 Hackathon**
+**Team THE DOMinators — india next hackthon Hackathon**
 
 | Name | Role |
 |---|---|
@@ -686,7 +686,7 @@ SOFTWARE.
 
 <div align="center">
 
-**Built with passion at KNOWCODE 3.0 by THE DOMinators**
+**Built with passion at india next hackthon by THE DOMinators**
 
 *"Empowering students. Eliminating fraud."*
 
